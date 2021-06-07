@@ -20,7 +20,7 @@ docker run --detach \\
     --volume /srv/gitlab/config:/etc/gitlab \\
     --volume /srv/gitlab/logs:/var/log/gitlab \\
     --volume /srv/gitlab/data:/var/opt/gitlab \\
-    registry.docker-cn.com/gitlab/gitlab-ce:11.2.2-ce.0
+    docker.mirrors.ustc.edu.cn/gitlab/gitlab-ce:11.2.2-ce.0
 EOF
 ```
 执行启动脚本：`sh gitlab-setup.sh` 执行成功后，等待数分钟可以看到
@@ -28,7 +28,7 @@ EOF
 ```
 $ docker ps -a
 CONTAINER ID        IMAGE                                                 COMMAND             CREATED             STATUS                   PORTS                                                            NAMES
-4f9d5f97f494        registry.docker-cn.com/gitlab/gitlab-ce:11.2.2-ce.0   "/assets/wrapper"   9 minutes ago       Up 9 minutes (healthy)   0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp, 0.0.0.0:6022->22/tcp   gitlab
+4f9d5f97f494        docker.mirrors.ustc.edu.cn/gitlab/gitlab-ce:11.2.2-ce.0   "/assets/wrapper"   9 minutes ago       Up 9 minutes (healthy)   0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp, 0.0.0.0:6022->22/tcp   gitlab
 ```
 ## 配置 gitlab
 
@@ -42,7 +42,7 @@ $ docker restart gitlab
 ```
 ## 首次访问 gitlab
 
-使用域名`gitlab.test.com`或者该主机 IP 首次登陆时会要求设置 root 用户的密码，完成后就可以用 root 和新设密码登陆；然后按需创建 Group, User, Projects等，还有相关配置。
+使用域名`gitlab.test.com`或者该主机 IP 首次登录时会要求设置 root 用户的密码，完成后就可以用 root 和新设密码登录；然后按需创建 Group, User, Projects等，还有相关配置。
 
 ## 备份数据
 
@@ -52,7 +52,7 @@ $ docker restart gitlab
 # 创建备份脚本
 cat > /root/gitlab-backup.sh << EOF
 #!/bin/bash
-# 请事先配置 gitlab 服务器到备份服务器的免密码 ssh 登陆
+# 请事先配置 gitlab 服务器到备份服务器的免密码 ssh 登录
 rsync -av --delete /srv/gitlab/config '-e ssh -l root' 192.168.1.xx:/backup_gitlab/config
 rsync -av --delete /srv/gitlab/data '-e ssh -l root' 192.168.1.xx:/backup_gitlab/data
 EOF

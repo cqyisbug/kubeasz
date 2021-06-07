@@ -1,6 +1,6 @@
 ## dashboard
 
-本文档基于 dashboard 1.6.3版本，从 1.7.x 版本以后，dashboard 默认开启自带的登陆验证界面，登陆流程差异详见[新版本](dashboard.md)。
+本文档基于 dashboard 1.6.3版本，从 1.7.x 版本以后，dashboard 默认开启自带的登录验证界面，登录流程差异详见[新版本](dashboard.md)。
 
 + 注意：实际测试k8s版本<=1.9.1支持dashboard 1.6.3, 建议k8s 1.9 以后使用 dashboard 新版本。
 
@@ -10,8 +10,8 @@
 # 部署dashboard 主yaml配置文件
 $ kubectl create -f /etc/ansible/manifests/dashboard/1.6.3/kubernetes-dashboard.yaml
 # 部署基本密码认证配置[可选]，密码文件位于 /etc/kubernetes/ssl/basic-auth.csv
-$ kubectl create -f /etc/ansible/manifests/dashboard/ui-admin-rbac.yaml
-$ kubectl create -f /etc/ansible/manifests/dashboard/ui-read-rbac.yaml
+$ kubectl create -f /etc/ansible/manifests/dashboard/1.6.3/ui-admin-rbac.yaml
+$ kubectl create -f /etc/ansible/manifests/dashboard/1.6.3/ui-read-rbac.yaml
 ```
 
 请在另外窗口打开 [kubernetes-dashboard.yaml](../../manifests/dashboard/1.6.3/kubernetes-dashboard.yaml)
@@ -42,13 +42,13 @@ kubectl logs kubernetes-dashboard-86bd8778bf-w4974 -n kube-system
 + 启用 `TLS认证` `RBAC授权`等安全特性
 + 关闭 apiserver非安全端口8080的外部访问`--insecure-bind-address=127.0.0.1`
 + 关闭匿名认证`--anonymous-auth=false`
-+ 补充启用基本密码认证 `--basic-auth-file=/etc/kubernetes/ssl/basic-auth.csv`，[密码文件模板](../../roles/kube-master/templates/basic-auth.csv.j2)中按照每行(密码,用户名,序号)的格式，可以定义多个用户
++ 补充启用基本密码认证 `--token-auth-file=/etc/kubernetes/ssl/basic-auth.csv`，[密码文件模板](../../roles/kube-master/templates/basic-auth.csv.j2)中按照每行(密码,用户名,序号)的格式，可以定义多个用户
 
 #### 1. 临时访问：使用 `http://NodeIP:NodePort` 方式直接访问 dashboard，生产环境建议关闭该途径
 
 #### 2. 用户+密码访问：安全性比证书方式差点，务必保管好密码文件`basic-auth.csv`
 
-- 这里演示两种权限，使用admin 登陆dashboard拥有所有权限，使用readonly 登陆后仅查看权限，首先在 master节点文件 `/etc/kubernetes/ssl/basic-auth.csv` 确认用户名和密码，如果要增加或者修改用户，修改保存该文件后记得逐个重启你的master 节点
+- 这里演示两种权限，使用admin 登录dashboard拥有所有权限，使用readonly 登录后仅查看权限，首先在 master节点文件 `/etc/kubernetes/ssl/basic-auth.csv` 确认用户名和密码，如果要增加或者修改用户，修改保存该文件后记得逐个重启你的master 节点
 - 为了演示用户密码访问，如果你已经完成证书访问方式，你可以在浏览器删除证书，或者访问时候浏览器询问你证书时不选证书
 - 2.1 设置用户admin 的RBAC 权限，如下运行配置文件 `kubectl create -f ui-admin-rbac.yaml`
 
@@ -114,7 +114,7 @@ subjects:
   kind: User
   name: readonly
 ```
-- 2.3 访问 `https://x.x.x.x:6443/api/v1/namespaces/kube-system/services/kubernetes-dashboard/proxy` 使用 admin登陆拥有所有权限，比如删除某个部署；使用 readonly登陆只有查看权限，尝试删除某个部署会提示错误 `forbidden: User \"readonly\" cannot delete services/proxy in the namespace \"kube-system\"`
+- 2.3 访问 `https://x.x.x.x:6443/api/v1/namespaces/kube-system/services/kubernetes-dashboard/proxy` 使用 admin登录拥有所有权限，比如删除某个部署；使用 readonly登录只有查看权限，尝试删除某个部署会提示错误 `forbidden: User \"readonly\" cannot delete services/proxy in the namespace \"kube-system\"`
 
 #### 3. 证书访问：最安全的方式，配置较复杂
 - 使用集群CA 生成客户端证书，可以根据需要生成权限不同的证书，这里为了演示直接使用 kubectl使用的证书和key(在03.kubectl.yml阶段生成)，该证书拥有所有权限

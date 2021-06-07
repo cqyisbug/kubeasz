@@ -1,16 +1,23 @@
 {
-  "registry-mirrors": ["{{ REG_MIRROR_1 }}", "{{ REG_MIRROR_2 }}"], 
+  "data-root": "{{ DOCKER_STORAGE_DIR }}",
+  "exec-opts": ["native.cgroupdriver={{ CGROUP_DRIVER }}"],
+{% if ENABLE_MIRROR_REGISTRY %}
+  "registry-mirrors": [
+    "https://docker.mirrors.ustc.edu.cn",
+    "http://hub-mirror.c.163.com"
+  ], 
+{% endif %}
+{% if ENABLE_REMOTE_API %}
+  "hosts": ["tcp://0.0.0.0:2376", "unix:///var/run/docker.sock"],
+{% endif %}
+  "insecure-registries": {{ INSECURE_REG }},
   "max-concurrent-downloads": 10,
-  "log-driver": "{{ LOG_DRIVER }}",
-  "log-level": "{{ LOG_LEVEL }}",
+  "live-restore": true,
+  "log-driver": "json-file",
+  "log-level": "warn",
   "log-opts": {
-    "max-size": "{{ LOG_MAX_SIZE }}",
-    "max-file": "{{ LOG_MAX_FILE }}"
+    "max-size": "50m",
+    "max-file": "1"
     },
-  "data-root": "{{ STORAGE_DIR }}"
-
-  {% if ENABLE_REMOTE_API %}
-  , "hosts": ["tcp://0.0.0.0:2376", "unix:///var/run/docker.sock"]
-  {% endif %}
-
+  "storage-driver": "overlay2"
 }

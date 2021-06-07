@@ -1,46 +1,49 @@
-- name: apt更新缓存刷新
-  apt: update_cache=yes cache_valid_time=72000
-  when: ansible_distribution == "Ubuntu" and ansible_distribution_major_version|int >= 16
+- name: prepare some dirs
+  file: name={{ item }} state=directory
+  with_items:
+  - "/etc/chrony"
+  - "/var/lib/chrony"
+  - "/var/log/chrony"
 
-- name: 确保已卸载ntp
-  package: name=ntp state=absent
+- name: apt 卸载 ntp
+  shell: 'apt remove -y ntp'
+  when: 'ansible_distribution in ["Ubuntu","Debian"]' 
+  ignore_errors: true
 
-- name: 安装 chrony
-  package: name=chrony state=latest
+- name: yum 卸载 ntp
+  shell: 'yum remove -y ntp'
+  when: 'ansible_distribution in ["CentOS","RedHat","Amazon","Aliyun"]'
+  args:
+      warn: false
+  ignore_errors: true
 
-- block:
-  - name: 配置 chrony server 
-    template: src=server-centos.conf.j2 dest=/etc/chrony.conf
-    when: (ansible_distribution == "CentOS" or ansible_distribution == "RedHat") and ansible_distribution_major_version == "7"
+- name: 下载二进制文件chronyd
+  copy: src={{ base_dir }}/bin/chronyd dest=/usr/sbin/chronyd mode=0755
 
-  - name: 配置 chrony server
-    template: src=server-ubuntu.conf.j2 dest=/etc/chrony/chrony.conf
-    when: ansible_distribution == "Ubuntu" and ansible_distribution_major_version|int >= 16
+- name: 创建chronyd的systemd unit文件
+  template: src=chronyd.service.j2 dest=/etc/systemd/system/chronyd.service
 
-  - name: 启动 chrony server
-    service: name=chronyd state=restarted enabled=yes
-    when: (ansible_distribution == "CentOS" or ansible_distribution == "RedHat") and ansible_distribution_major_version == "7"
-  
-  - name: 启动 chrony server
-    service: name=chrony state=restarted enabled=yes
-    when: ansible_distribution == "Ubuntu" and ansible_distribution_major_version|int >= 16 
-  when: 'inventory_hostname == groups.deploy[0]'
+- name: 配置 chrony server
+  template: src=server.conf.j2 dest=/etc/chrony/chrony.conf
+  when: 'inventory_hostname == groups.chrony[0]'
 
-- block:
-  - name: 配置 chrony client
-    template: src=client-centos.conf.j2 dest=/etc/chrony.conf
-    when: (ansible_distribution == "CentOS" or ansible_distribution == "RedHat") and ansible_distribution_major_version == "7"
+- name: 配置 chrony client
+  template: src=client.conf.j2 dest=/etc/chrony/chrony.conf
+  when: 'inventory_hostname != groups.chrony[0]'
 
-  - name: 配置 chrony client
-    template: src=client-ubuntu.conf.j2 dest=/etc/chrony/chrony.conf
-    when: ansible_distribution == "Ubuntu" and ansible_distribution_major_version|int >= 16
+- name: 开机启用chronyd服务
+  shell: systemctl enable chronyd
+  ignore_errors: true
 
-  - name: 启动 chrony client 
-    service: name=chronyd state=restarted enabled=yes
-    when: (ansible_distribution == "CentOS" or ansible_distribution == "RedHat") and ansible_distribution_major_version == "7"
+- name: 开启chronyd服务
+  shell: systemctl daemon-reload && systemctl restart chronyd
+  ignore_errors: true
+  tags: restart_chronyd
 
-  - name: 启动 chrony client
-    service: name=chrony state=restarted enabled=yes
-    when: ansible_distribution == "Ubuntu" and ansible_distribution_major_version|int >= 16
-  when: 'inventory_hostname != groups.deploy[0]'
-
+- name: 以轮询的方式等待chronyd服务启动
+  shell: "systemctl is-active chronyd.service"
+  register: svc_status
+  until: '"active" in svc_status.stdout'
+  retries: 3
+  delay: 3
+  tags: restart_chronyd

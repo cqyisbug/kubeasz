@@ -1,3 +1,8 @@
-- hosts: all
+- hosts:
+  - kube_master
+  - kube_node
+  - etcd
+  - ex_lb
+  - chrony
   roles:
-  - { role: chrony, when: "hostvars[groups.deploy[0]]['NTP_ENABLED'] == 'yes'" }
+  - { role: chrony, when: "groups['chrony']|length > 0" }

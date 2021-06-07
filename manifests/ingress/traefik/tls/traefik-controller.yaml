@@ -25,7 +25,7 @@ data:
             KeyFile = "/ssl/tls.key"
 ---
 kind: Deployment
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 metadata:
   name: traefik-ingress-controller
   namespace: kube-system
@@ -54,7 +54,7 @@ spec:
       #nodeSelector:
       #  node-role.kubernetes.io/traefik: "true"
       containers:
-      - image: traefik:v1.7.4
+      - image: traefik:v1.7.20
         imagePullPolicy: IfNotPresent
         name: traefik-ingress-lb
         volumeMounts:

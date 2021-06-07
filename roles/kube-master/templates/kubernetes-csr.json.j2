@@ -2,11 +2,15 @@
   "CN": "kubernetes",
   "hosts": [
     "127.0.0.1",
-    "{{ MASTER_IP }}",
-    "{{ inventory_hostname }}",
+{% if groups['ex_lb']|length > 0 %}
+    "{{ hostvars[groups['ex_lb'][0]]['EX_APISERVER_VIP'] }}",
+{% endif %}
+{% for host in groups['kube_master'] %}
+    "{{ host }}",
+{% endfor %}
     "{{ CLUSTER_KUBERNETES_SVC_IP }}",
-{% for HOST in MASTER_CERT_HOSTS %}
-    "{{ HOST }}",
+{% for host in MASTER_CERT_HOSTS %}
+    "{{ host }}",
 {% endfor %}
     "kubernetes",
     "kubernetes.default",

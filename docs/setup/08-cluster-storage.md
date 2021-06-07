@@ -11,9 +11,9 @@
 本篇以介绍 **NFS存储** 为例，讲解k8s 众多存储方案中的一个实现。
 
 ## 静态 PV
-首先我们需要一个NFS服务器，用于提供底层存储。通过文档[nfs-server](nfs-server.md)，我们可以创建一个NFS服务器。
+首先我们需要一个NFS服务器，用于提供底层存储。通过文档[nfs-server](../guide/nfs-server.md)，我们可以创建一个NFS服务器。
 
-- 创建静态 pv，指定容量，访问模式，回收策略，存储类等；参考[这里](https://github.com/feiskyer/kubernetes-handbook/blob/master/zh/concepts/persistent-volume.md)
+- 创建静态 pv，指定容量，访问模式，回收策略，存储类等
 
 ``` bash
 apiVersion: v1
@@ -40,62 +40,60 @@ spec:
 
 在一个工作k8s 集群中，`PVC`请求会很多，如果每次都需要管理员手动去创建对应的 `PV`资源，那就很不方便；因此 K8S还提供了多种 `provisioner`来动态创建 `PV`，不仅节省了管理员的时间，还可以根据`StorageClasses`封装不同类型的存储供 PVC 选用。
 
-项目中的 `role: cluster-storage`目前支持自建nfs 和aliyun_nas 的动态`provisioner`
+项目中以nfs-client-provisioner为例（https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner）
 
-- 1.更新项目源码，生成自定义配置文件（该配置文件被.gitignore忽略）
+- 1.编辑集群配置文件：clusters/${集群名}/config.yml
 
 ``` bash
-$ ansible-playbook /etc/ansible/tools/init_vars.yml
+... 省略
+# 在role:cluster-addon 中启用nfs-provisioner 安装
+nfs_provisioner_install: "yes"			# 修改为yes
+nfs_provisioner_namespace: "kube-system"
+nfs_provisioner_ver: "v4.0.1"
+nfs_storage_class: "managed-nfs-storage"	
+nfs_server: "192.168.31.244"			# 修改为实际nfs server地址
+nfs_path: "/data/nfs"				# 修改为实际的nfs共享目录
+
 ```
-- 2.编辑自定义配置文件：上述命令执行后生成的roles/cluster-storage/vars/main.yml
+
+- 2.创建 nfs provisioner
 
 ``` bash
-# 比如创建nfs provisioner
-storage:
-  nfs:
-    enabled: "yes"
-    server: "192.168.1.8"
-    server_path: "/data/nfs"
-    storage_class: "class-nfs-01"
-    provisioner_name: "nfs-provisioner-01"
-```
-- 3.创建 nfs provisioner
+$ ezctl setup ${集群名} 07 
 
-``` bash
-$ ansible-playbook /etc/ansible/roles/cluster-storage/cluster-storage.yml
 # 执行成功后验证
-$ kubectl get pod --all-namespaces |grep nfs-prov
-kube-system   nfs-provisioner-01-6b7fbbf9d4-bh8lh        1/1       Running   0          1d
+$ kubectl get pod --all-namespaces |grep nfs-client
+kube-system   nfs-client-provisioner-84ff87c669-ksw95      1/1     Running     0          21m
 ```
-**注意** k8s集群可以使用多个nfs provisioner，重复上述步骤2 修改使用不同的`nfs server` `nfs_storage_class` `nfs_provisioner_name`后执行步骤3创建即可。
 
 ## 验证使用动态 PV
 
-切换到项目`manifests/storage`目录，编辑`test.yaml`文件，根据前文配置情况修改`storageClassName`即可；然后执行以下命令进行创建：
+在目录clusters/${集群名}/yml/nfs-provisioner/ 有个测试例子
 
 ``` bash
-$ kubectl apply -f test.yaml
+$ kubectl apply -f /etc/kubeasz/clusters/hello/yml/nfs-provisioner/test-pod.yaml
 
 # 验证测试pod
-$ kubectl get pod --all-namespaces |grep test
-default       test                                       1/1       Running   0          1m
+kubectl get pod
+NAME       READY   STATUS      RESTARTS   AGE
+test-pod   0/1     Completed   0          6h36m
 
 # 验证自动创建的pv 资源，
-$ kubectl get pv
-NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS    CLAIM                STORAGECLASS           REASON    AGE
-pvc-8f1b4ced-92d2-11e8-a41f-5254008ec7c0   1Mi        RWX            Delete           Bound     default/test-claim   nfs-dynamic-class-01             3m
+kubectl get pv
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                STORAGECLASS          REASON   AGE
+pvc-44d34a50-e00b-4f6c-8005-40f5cc54af18   2Mi        RWX            Delete           Bound    default/test-claim   managed-nfs-storage            6h36m
 
 # 验证PVC已经绑定成功：STATUS字段为 Bound
-$ kubectl get pvc
-NAME         STATUS    VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS           AGE
-test-claim   Bound     pvc-8f1b4ced-92d2-11e8-a41f-5254008ec7c0   1Mi        RWX            nfs-dynamic-class-01   3m
+kubectl get pvc
+NAME         STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS          AGE
+test-claim   Bound    pvc-44d34a50-e00b-4f6c-8005-40f5cc54af18   2Mi        RWX            managed-nfs-storage   6h37m
 ```
 
 另外，Pod启动完成后，在挂载的目录中创建一个`SUCCESS`文件。我们可以到NFS服务器去看下：
 
 ```
 .
-└── default-test-claim-pvc-a877172b-5f49-11e8-b675-d8cb8ae6325a
+└── default-test-claim-pvc-44d34a50-e00b-4f6c-8005-40f5cc54af18
     └── SUCCESS
 ```
 如上，可以发现挂载的时候，nfs-client根据PVC自动创建了一个目录，我们Pod中挂载的`/mnt`，实际引用的就是该目录，而我们在`/mnt`下创建的`SUCCESS`文件，也自动写入到了这里。

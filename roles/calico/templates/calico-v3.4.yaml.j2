@@ -21,7 +21,7 @@ data:
   etcd_cert: "/calico-secrets/etcd-cert"
   etcd_key: "/calico-secrets/etcd-key"
   # Configure the Calico backend to use.
-  calico_backend: "bird"
+  calico_backend: "{{ CALICO_NETWORKING_BACKEND }}"
 
   # Configure the MTU to use
   veth_mtu: "1440"
@@ -69,7 +69,7 @@ data:
 # as the Calico CNI plugins and network config on
 # each master and worker node in a Kubernetes cluster.
 kind: DaemonSet
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 metadata:
   name: calico-node
   namespace: kube-system
@@ -87,13 +87,8 @@ spec:
     metadata:
       labels:
         k8s-app: calico-node
-      annotations:
-        # This, along with the CriticalAddonsOnly toleration below,
-        # marks the pod as a critical add-on, ensuring it gets
-        # priority scheduling and that its resources are reserved
-        # if it ever gets evicted.
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-cluster-critical
       nodeSelector:
         beta.kubernetes.io/os: linux
       hostNetwork: true
@@ -199,8 +194,15 @@ spec:
             - name: IP_AUTODETECTION_METHOD
               value: "{{ IP_AUTODETECTION_METHOD }}"
             # Enable IPIP
+{% if CALICO_NETWORKING_BACKEND == "brid" %}
             - name: CALICO_IPV4POOL_IPIP
               value: "{{ CALICO_IPV4POOL_IPIP }}"
+{% endif %}
+            # Enable or Disable VXLAN on the default IP pool.
+{% if CALICO_NETWORKING_BACKEND == "vxlan" %}
+            - name: CALICO_IPV4POOL_VXLAN
+              value: "Never"
+{% endif %}
             # Set MTU for tunnel device used if ipip is enabled
             - name: FELIX_IPINIPMTU
               valueFrom:
@@ -223,7 +225,7 @@ spec:
               value: "false"
             # Set Felix logging 
             - name: FELIX_LOGSEVERITYSCREEN
-              value: "{{ FELIX_LOG_LVL }}"
+              value: "warning"
             - name: FELIX_HEALTHENABLED
               value: "true"
             # Set Kubernetes NodePorts: If services do use NodePorts outside Calico’s expected range,
@@ -249,7 +251,9 @@ spec:
             exec:
               command:
               - /bin/calico-node
+{% if CALICO_NETWORKING_BACKEND == "brid" %}
               - -bird-ready
+{% endif %}
               - -felix-ready
             periodSeconds: 10
           volumeMounts:
@@ -307,15 +311,13 @@ metadata:
 
 # This manifest deploys the Calico Kubernetes controllers.
 # See https://github.com/projectcalico/kube-controllers
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: calico-kube-controllers
   namespace: kube-system
   labels:
     k8s-app: calico-kube-controllers
-  annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ''
 spec:
   # The controllers can only have a single active instance.
   replicas: 1
@@ -331,6 +333,7 @@ spec:
       labels:
         k8s-app: calico-kube-controllers
     spec:
+      priorityClassName: system-cluster-critical
       nodeSelector:
         beta.kubernetes.io/os: linux
       # The controllers must run in the host network namespace so that
@@ -374,13 +377,6 @@ spec:
             # Choose which controllers to run.
             - name: ENABLED_CONTROLLERS
               value: policy,namespace,serviceaccount,workloadendpoint,node
-{% if NODE_WITH_MULTIPLE_NETWORKS == 'true' %}
-            # if hosts have multiple net interfaces, set following two ENVs
-            - name: KUBERNETES_SERVICE_HOST
-              value: "{{ MASTER_IP }}"
-            - name: KUBERNETES_SERVICE_PORT
-              value: "{{ KUBE_APISERVER.split(':')[2] }}"
-{% endif %}
           volumeMounts:
             # Mount in the etcd TLS secrets.
             - mountPath: /calico-secrets

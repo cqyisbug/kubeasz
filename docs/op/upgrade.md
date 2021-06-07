@@ -2,7 +2,7 @@
 
 集群升级存在一定风险，请谨慎操作。 
 
-- 项目分支`master`安装的集群可以在k8s 1.8/1.9/1.10/1.11/1.12/1.13 任意小版本、大版本间升级（特别注意如果跨大版本升级需要修改/etc/ansible/hosts文件中的参数K8S_VER）
+- 项目分支`master`安装的集群可以在当前支持k8s大版本基础上升级任意小版本，比如当前安装集群为1.16.0，你可以方便的升级到任何1.16.x版本
 - 项目分支`closed`（已停止更新）安装的集群目前只能进行小版本1.8.x的升级
 
 ### 备份etcd数据 
@@ -22,14 +22,19 @@ $ ETCDCTL_API=3 etcdctl --write-out=table snapshot status backup.db
 快速升级是指只升级`k8s`版本，比较常见如`Bug修复` `重要特性发布`时使用。
 
 - 首先去官网release下载待升级的k8s版本，例如`https://dl.k8s.io/v1.11.5/kubernetes-server-linux-amd64.tar.gz`
-- 解压下载的tar.gz文件，找到如下`kube*`开头的二进制，复制替换deploy节点目录`/etc/ansible/bin`对应文件
+- 解压下载的tar.gz文件，找到如下`kube*`开头的二进制，复制替换ansible控制端目录`/etc/ansible/bin`对应文件
   - kube-apiserver
   - kube-controller-manager
   - kubectl
   - kubelet
   - kube-proxy
   - kube-scheduler
-- 在deploy节点执行`ansible-playbook -t upgrade_k8s 22.upgrade.yml`即可完成k8s 升级，不会中断业务应用
+- 在ansible控制端执行`ansible-playbook -t upgrade_k8s 22.upgrade.yml`即可完成k8s 升级，不会中断业务应用
+
+如果使用 ezctl 命令行，可按如下执行：
+
+- 首先确认待升级的集群（如果有多集群的话） `ezctl checkout <cluster_name>`
+- 执行升级 `ezctl upgrade`
 
 ### 其他升级说明
 

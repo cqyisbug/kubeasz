@@ -1,8 +1,0 @@
-# to install docker service
-- hosts:
-  - kube-master
-  - new-master
-  - kube-node
-  - new-node
-  roles:
-  - docker
